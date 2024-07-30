@@ -7,16 +7,40 @@ from openpyxl.styles import Alignment
 from consolidate_cei import consolidate_cei_extracts
 
 def main():
-    try:
-        action, param = get_args()
-    except:
-        print(f'\nUsageError: incorrect parameters.\nCorrect usage methods:\npython {__file__} --declaracao [ano]\npython {__file__} --posicao [data:yyyy-mm-dd]')
-        return
+
+    action = "--declaracao"
+
+    param = 2022
+
+    # try:
+    #     action, param = get_args()
+    # except:
+    #     print(f'\nUsageError: incorrect parameters.\nCorrect usage methods:\npython {__file__} --declaracao [ano]\npython {__file__} --posicao [data:yyyy-mm-dd]')
+    #     return
 
     transactions = consolidate_cei_extracts(save_to_file = False)
     
     transactions = transactions[transactions["Tipo"]!="desconhecido"]
-    
+
+    ### Check for bonification withouth prices 
+
+    all_transactions_movements = transactions['Movimentação'].unique()
+
+    for movement in all_transactions_movements:
+        if 'Bonificação' in movement:
+
+            transactions_bonification = transactions[transactions['Movimentação']==movement]
+
+            transactions_prices = transactions_bonification['Preco']
+
+            for price in transactions_prices:
+                try:
+                    float(price)
+                except:
+                    raise Exception("Bonification withouth price detected in xlsx file. Please correct it before you proceed")
+
+
+
     if action == '--declaracao':
         declaration, realised_monthly_stocks, realised_monthly_fii, realised_monthly_options = get_declaration_info(transactions, param)
         realised_monthly = pd.concat([realised_monthly_stocks, realised_monthly_fii, realised_monthly_options], axis = 1).fillna(0).sum(axis = 1)
@@ -164,10 +188,15 @@ def get_position_info(transactions, limit_date, ignore_history_previous_to = 190
         # ignore_history = ignore_history_previous_to > transaction_date.year
         ignore_history = False
         
-        if transaction['Fluxo'] == 'C':
-            position, realised = process_buy(transaction_date, position, transaction, ignore_history, vencimento_opcao)
-        elif transaction['Fluxo'] == 'V':
-            position, realised = process_sell(transaction_date, position, transaction, ignore_history, vencimento_opcao)
+        try:
+            if transaction['Fluxo'] == 'C':
+                    position, realised = process_buy(transaction_date, position, transaction, ignore_history, vencimento_opcao)
+            elif transaction['Fluxo'] == 'V':
+                position, realised = process_sell(transaction_date, position, transaction, ignore_history, vencimento_opcao)
+        except Exception as e:
+            print("Error while processing transaction {0}".format(transaction))
+            print(e)
+            return 
 
         position = update_position_status(position)
 

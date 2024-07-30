@@ -18,7 +18,13 @@ def consolidate_cei_extracts(base_folder = 'movimentacoes', save_to_file = False
         # broker = re.search(r'negociacoes_cei_(.*)\.xlsx?$', cei_file)[1]
         filepath = os.path.join(base_folder, cei_file)
 
-        file_transactions = pd.read_excel(filepath,usecols=cols, engine='openpyxl')
+
+
+        file_transactions = pd.read_excel(filepath)
+
+        file_transactions = file_transactions[cols]
+
+
         file_transactions['Ativo'] = file_transactions['Produto'].copy()
         file_transactions['Produto'] = file_transactions['Produto'].apply(lambda t: t.split('-')[0].strip())
 
@@ -40,9 +46,9 @@ def consolidate_cei_extracts(base_folder = 'movimentacoes', save_to_file = False
         
     transactions['Fluxo'].replace({'Credito':'C','Debito':'V'},inplace=True)
     
-    transactions["Quantidade"] = transactions["Quantidade"].map(lambda q: q if (type(q) is int) else q.replace(",",".")) # bonificacao tem quantidade com ","
+    transactions["Quantidade"] = transactions["Quantidade"].map(lambda q: q if (type(q) is int) else (q if (type(q) is float) else float(q.replace(",",".")))) # bonificacao tem quantidade com ","
     
-    transactions["Quantidade"] = pd.to_numeric(transactions["Quantidade"])
+    transactions["Quantidade"] = pd.to_numeric(transactions["Quantidade"],downcast="integer")
     transactions['Quantidade'] = transactions['Quantidade'] * transactions['Fluxo'].map({"C": 1, "V": -1})
     transactions['Valor Total'] = transactions['Valor Total'] * transactions['Fluxo'].map({"C": 1, "V": -1})
     transactions['Tipo'] = transactions.apply(define_product_type, axis = 1)
